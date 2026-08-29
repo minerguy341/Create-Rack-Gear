@@ -1,33 +1,55 @@
 package com.minerguy341.rackgear.registry;
 
+import static com.simibubi.create.foundation.data.TagGen.axeOrPickaxe;
 import static com.simibubi.create.foundation.data.TagGen.pickaxeOnly;
 
 import com.minerguy341.rackgear.CreateRackGear;
+import com.minerguy341.rackgear.content.RackMeshing;
+import com.minerguy341.rackgear.content.pinion.RackPinionBlock;
+import com.minerguy341.rackgear.content.pinion.RackPinionModel;
+import com.minerguy341.rackgear.content.rack.RackBlock;
+import com.simibubi.create.api.stress.BlockStressValues;
+import com.simibubi.create.foundation.data.BlockStateGen;
 import com.simibubi.create.foundation.data.CreateRegistrate;
 import com.simibubi.create.foundation.data.SharedProperties;
 import com.tterrag.registrate.util.entry.BlockEntry;
 
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.MapColor;
 
 /**
- * Block registry. Registrate generates the blockstate, models, item model, loot table and
- * en_us entry for everything declared here when {@code gradlew runData} is run.
+ * Block registry. Registrate generates the blockstate, item model, loot table and en_us entry for
+ * these when {@code gradlew runData} is run; the block models themselves are authored by hand under
+ * {@code src/main/resources}.
  */
 public class RackGearBlocks {
 
+	/** Stress the pinion can support per RPM it generates, matching Create's water wheel. */
+	private static final double STRESS_CAPACITY = 8;
+
 	private static final CreateRegistrate REGISTRATE = CreateRackGear.registrate();
 
-	/**
-	 * Placeholder for the mod's namesake block. Swap {@code Block::new} for a kinetic block
-	 * (e.g. a subclass of {@code RotatedPillarKineticBlock}) and give it a
-	 * {@code KineticBlockEntity} once the mechanics are in place.
-	 */
-	public static final BlockEntry<Block> RACK_GEAR = REGISTRATE
-		.block("rack_gear", Block::new)
+	public static final BlockEntry<RackBlock> RACK = REGISTRATE.block("rack", RackBlock::new)
 		.initialProperties(SharedProperties::stone)
-		.properties(p -> p.mapColor(MapColor.PODZOL))
+		.properties(p -> p.mapColor(MapColor.METAL)
+			.sound(SoundType.NETHERITE_BLOCK)
+			.noOcclusion())
 		.transform(pickaxeOnly())
+		.blockstate(BlockStateGen.axisBlockProvider(false))
+		.simpleItem()
+		.register();
+
+	public static final BlockEntry<RackPinionBlock> RACK_PINION = REGISTRATE
+		.block("rack_pinion", RackPinionBlock::new)
+		.initialProperties(SharedProperties::stone)
+		.properties(p -> p.mapColor(MapColor.DIRT)
+			.sound(SoundType.WOOD)
+			.noOcclusion())
+		.transform(axeOrPickaxe())
+		.blockstate(BlockStateGen.axisBlockProvider(false))
+		.onRegister(CreateRegistrate.blockModel(() -> RackPinionModel::new))
+		.onRegister(block -> BlockStressValues.CAPACITIES.register(block, () -> STRESS_CAPACITY))
+		.onRegister(BlockStressValues.setGeneratorSpeed((int) RackMeshing.MAX_RPM, true))
 		.simpleItem()
 		.register();
 

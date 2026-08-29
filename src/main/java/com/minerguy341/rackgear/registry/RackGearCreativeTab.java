@@ -21,7 +21,7 @@ public class RackGearCreativeTab {
 	public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN = TABS.register("main",
 		() -> CreativeModeTab.builder()
 			.title(Component.translatable("itemGroup." + CreateRackGear.ID))
-			.icon(() -> RackGearBlocks.RACK_GEAR.asStack())
+			.icon(() -> RackGearBlocks.RACK_PINION.asStack())
 			.displayItems((parameters, output) -> {
 			})
 			.build());

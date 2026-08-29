@@ -1,0 +1,20 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "misc",
+	"pattern": [
+		"III",
+		"AAA"
+	],
+	"key": {
+		"I": {
+			"item": "minecraft:iron_ingot"
+		},
+		"A": {
+			"item": "create:andesite_alloy"
+		}
+	},
+	"result": {
+		"id": "create_rack_gear:rack",
+		"count": 4
+	}
+}

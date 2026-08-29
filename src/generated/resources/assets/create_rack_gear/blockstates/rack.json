@@ -1,0 +1,17 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "create_rack_gear:block/rack",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "create_rack_gear:block/rack"
+    },
+    "axis=z": {
+      "model": "create_rack_gear:block/rack",
+      "x": 90,
+      "y": 180
+    }
+  }
+}

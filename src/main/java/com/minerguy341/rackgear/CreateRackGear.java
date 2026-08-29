@@ -11,6 +11,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 
+import com.minerguy341.rackgear.registry.RackGearBlockEntities;
 import com.minerguy341.rackgear.registry.RackGearBlocks;
 import com.minerguy341.rackgear.registry.RackGearCreativeTab;
 
@@ -37,6 +38,7 @@ public class CreateRackGear {
 		REGISTRATE.setCreativeTab(RackGearCreativeTab.MAIN);
 
 		RackGearBlocks.register();
+		RackGearBlockEntities.register();
 
 		REGISTRATE.addDataGenerator(ProviderType.LANG,
 			provider -> provider.add("itemGroup." + ID, NAME));

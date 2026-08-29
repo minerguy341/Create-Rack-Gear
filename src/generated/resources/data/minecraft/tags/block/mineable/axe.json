@@ -1,6 +1,5 @@
 {
   "values": [
-    "create_rack_gear:rack",
     "create_rack_gear:rack_pinion"
   ]
 }

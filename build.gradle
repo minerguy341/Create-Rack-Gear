@@ -67,6 +67,15 @@ neoForge {
             sourceSet sourceSets.main
         }
     }
+
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
 
 sourceSets.main.resources.srcDir 'src/generated/resources'
@@ -76,6 +85,10 @@ dependencies {
     implementation "com.simibubi.create:create-${minecraft_version}:${create_version}"
     // Declared explicitly so the version is visible and pinnable.
     implementation "com.tterrag.registrate:Registrate:${registrate_version}"
+
+    testImplementation platform('org.junit:junit-bom:5.10.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 // Expand the gradle.properties values used in neoforge.mods.toml and pack.mcmeta.

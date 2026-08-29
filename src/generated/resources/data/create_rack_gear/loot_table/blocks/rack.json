@@ -11,11 +11,11 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "create_rack_gear:rack_gear"
+          "name": "create_rack_gear:rack"
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "create_rack_gear:blocks/rack_gear"
+  "random_sequence": "create_rack_gear:blocks/rack"
 }
