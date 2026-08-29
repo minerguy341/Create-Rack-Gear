@@ -1,6 +1,7 @@
 package com.minerguy341.rackgear.registry;
 
 import com.minerguy341.rackgear.CreateRackGear;
+import com.minerguy341.rackgear.client.RackGearPartialModels;
 import com.minerguy341.rackgear.content.pinion.RackPinionBlockEntity;
 import com.minerguy341.rackgear.content.rack.DrivenRackBlockEntity;
 import com.minerguy341.rackgear.content.pinion.RackPinionRenderer;
@@ -15,6 +16,7 @@ public class RackGearBlockEntities {
 
 	public static final BlockEntityEntry<RackPinionBlockEntity> RACK_PINION = REGISTRATE
 		.blockEntity("rack_pinion", RackPinionBlockEntity::new)
+		.visual(() -> SingleAxisRotatingVisual.of(RackGearPartialModels.RACK_PINION), false)
 		.validBlocks(RackGearBlocks.RACK_PINION)
 		.renderer(() -> RackPinionRenderer::new)
 		.register();

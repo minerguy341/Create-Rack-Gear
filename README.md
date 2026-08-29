@@ -95,11 +95,8 @@ Being an actor also means the pinion is disabled by Contraption Controls like an
 it has `visitNewPosition` available — the hook Create's drills and harvesters use to affect the world
 they pass over.
 
-Taking over the rendering has one known cost: `RackPinionModel` now drops the block's baked quads
-everywhere, so anything that draws the block from its baked model alone — a schematic preview, a
-Ponder scene — shows nothing where the pinion should be. If that turns out to matter, the fix is the
-one Create uses for brackets: stash a flag in `ModelData` from `getModelData`, which does get handed
-the world, and keep the static quads for every virtual world except a contraption's.
+Taking over the rendering means the pinion is never drawn from its baked model; see
+[Rendering](#rendering) for how every path draws it instead, and what that costs.
 
 ### The Driven Rack
 
@@ -124,26 +121,28 @@ engine in exactly this way.
 
 ```
 src/main/java/com/minerguy341/rackgear/
-├── CreateRackGear.java                  @Mod entry point, owns the CreateRegistrate
+├── CreateRackGear.java                      @Mod entry point, owns the CreateRegistrate
+├── client/
+│   └── RackGearPartialModels.java           models drawn outside the baked chunk mesh
 ├── content/
-│   ├── RackMeshing.java                 meshing geometry, direction and speed conversion
+│   ├── RackMeshing.java                     meshing geometry, direction and speed conversion
 │   ├── rack/
-│   │   ├── RackTeeth.java               shared teeth: what a pinion can mesh with
-│   │   ├── RackBlock.java               the plain toothed bar
-│   │   ├── DrivenRackBlock.java         rack segment with a shaft, bar and shaft axes
-│   │   └── DrivenRackBlockEntity.java   holds the rotation a passing pinion produces
+│   │   ├── RackTeeth.java                   shared teeth: what a pinion can mesh with
+│   │   ├── RackBlock.java                   the plain toothed bar
+│   │   ├── DrivenRackBlock.java             rack segment with a shaft, bar and shaft axes
+│   │   └── DrivenRackBlockEntity.java       holds the rotation a passing pinion produces
 │   └── pinion/
-│       ├── RackPinionBlock.java              large cog that Create's propagator meshes with
-│       ├── RackPinionBlockEntity.java        finds passing racks, generates the rotation
-│       ├── RackPinionMovementBehaviour.java  actor: rolls along world racks on a contraption
-│       ├── RackPinionActorVisual.java        instanced rendering of the rolling cog
-│       ├── RackPinionActorRenderer.java      fallback rendering of the rolling cog
-│       ├── RackPinionRenderer.java           draws the cog spinning in the world
-│       └── RackPinionModel.java              keeps the static copy out of the baked mesh
+│       ├── RackPinionBlock.java             large cog that Create's propagator meshes with
+│       ├── RackPinionBlockEntity.java       finds passing racks, generates the rotation
+│       ├── RackPinionMovementBehaviour.java actor: rolls along world racks, drives Driven Racks
+│       ├── RackPinionActorVisual.java       instanced rendering of the rolling cog
+│       ├── RackPinionActorRenderer.java     fallback rendering of the rolling cog
+│       ├── RackPinionRenderer.java          fallback rendering of the cog in the world
+│       └── RackPinionModel.java             keeps the block out of the baked chunk mesh
 └── registry/
-    ├── RackGearBlocks.java              block + item registration
-    ├── RackGearBlockEntities.java       block entity types and renderers
-    └── RackGearCreativeTab.java         creative tab (Registrate fills the contents)
+    ├── RackGearBlocks.java                  block + item registration
+    ├── RackGearBlockEntities.java           block entity types, visuals and renderers
+    └── RackGearCreativeTab.java             creative tab (Registrate fills the contents)
 
 src/main/resources/
 ├── META-INF/neoforge.mods.toml          mod metadata, templated from gradle.properties
@@ -166,27 +165,31 @@ the mod's creative tab automatically, which is why `RackGearCreativeTab` declare
 
 ## Rendering
 
-Everything that turns is instanced through Flywheel, except one case:
+Everything that turns is instanced through Flywheel, with a renderer for when the backend is off:
 
 | Part | Flywheel | Fallback |
 | --- | --- | --- |
-| Driven Rack shaft | `SingleAxisRotatingVisual::shaft`, Create's own shaft visual | `ShaftRenderer` |
+| Pinion standing in the world | `SingleAxisRotatingVisual.of(RACK_PINION)` | `RackPinionRenderer` |
 | Pinion rolling on a contraption | `RackPinionActorVisual` | `RackPinionActorRenderer` |
-| Pinion standing in the world | none | `RackPinionRenderer`, on every backend |
+| Driven Rack shaft | `SingleAxisRotatingVisual::shaft`, Create's own shaft visual | `ShaftRenderer` |
 
-The last row is the odd one out. Create's cogwheels are instanced through a visual keyed on a
-`PartialModel`; this pinion has no partial model of its own — it borrows Create's large cogwheel
-model through the blockstate — so it is drawn by the block entity renderer whatever the backend is.
-That costs a draw call per pinion rather than an instance. Registering a `PartialModel` at client
-init and swapping in `SingleAxisRotatingVisual.of(...)` is the fix.
+A block whose model is drawn turning cannot also sit in the baked chunk mesh, or it would appear
+twice. So `RackPinionModel` drops the pinion's quads, and every path above draws
+`RackGearPartialModels.RACK_PINION` instead — the same split Create uses for its own cogwheels,
+which is why their renderer draws `SHAFTLESS_LARGE_COGWHEEL` rather than the block's own model. The
+partial is authored along Y, like Create's cog models, and each renderer turns it onto the block's
+axis.
+
+Dropping the baked quads has one known cost: anything that draws the block from its baked model
+alone — a schematic preview, a Ponder scene — shows nothing where the pinion should be. If that
+matters, the fix is the one Create uses for brackets: stash a flag in `ModelData` from
+`getModelData`, which does get handed the world, and keep the static quads for every virtual world
+except a contraption's.
 
 ## Next steps
 
 - **Its own model.** The pinion currently parents `create:block/large_cogwheel`, so it is
   indistinguishable from a large cogwheel in hand and in world.
-- **A Flywheel visual for the pinion standing in the world.** The Driven Rack's shaft and the rolling
-  pinion are both instanced (see below), but `RackPinionRenderer` still draws on every backend,
-  because instancing the cog needs a `PartialModel` of its own registered at client init.
 - **Kinetic output for the rolling pinion**, per the section above.
 - **A Ponder scene** under `data/create_rack_gear/ponder/`, which is how Create explains mechanics.
 

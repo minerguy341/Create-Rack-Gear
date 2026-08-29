@@ -1,5 +1,6 @@
 package com.minerguy341.rackgear.content.pinion;
 
+import com.minerguy341.rackgear.client.RackGearPartialModels;
 import com.simibubi.create.content.contraptions.behaviour.MovementContext;
 import com.simibubi.create.content.contraptions.render.ActorVisual;
 import com.simibubi.create.foundation.virtualWorld.VirtualRenderWorld;
@@ -26,7 +27,7 @@ public class RackPinionActorVisual extends ActorVisual {
 		MovementContext context) {
 		super(visualizationContext, contraption, context);
 		axis = context.state.getValue(RackPinionBlock.AXIS);
-		cog = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.block(context.state))
+		cog = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.partial(RackGearPartialModels.RACK_PINION))
 			.createInstance();
 	}
 
@@ -38,11 +39,29 @@ public class RackPinionActorVisual extends ActorVisual {
 
 	@Override
 	public void beginFrame() {
-		float partialTicks = AnimationTickHolder.getPartialTicks();
+		float spin = AngleHelper.angleLerp(AnimationTickHolder.getPartialTicks(), previousAngle, angle);
 		cog.setIdentityTransform()
 			.translate(context.localPos)
-			.rotateCenteredDegrees(AngleHelper.angleLerp(partialTicks, previousAngle, angle), axis)
+			.center()
+			// The cog is authored along Y, so it is turned onto its axis with the same rotations the
+			// blockstate uses, and then spun around its own axis, which is innermost.
+			.rotateYDegrees(blockstateYRotation())
+			.rotateXDegrees(blockstateXRotation())
+			.rotateYDegrees(spin)
+			.uncenter()
 			.setChanged();
+	}
+
+	private float blockstateXRotation() {
+		return axis == Axis.Y ? 0 : 90;
+	}
+
+	private float blockstateYRotation() {
+		return switch (axis) {
+			case X -> 90;
+			case Y -> 0;
+			case Z -> 180;
+		};
 	}
 
 	@Override
