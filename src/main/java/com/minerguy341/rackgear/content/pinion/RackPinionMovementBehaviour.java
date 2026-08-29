@@ -3,8 +3,11 @@ package com.minerguy341.rackgear.content.pinion;
 import org.jetbrains.annotations.Nullable;
 
 import com.minerguy341.rackgear.content.RackMeshing;
-import com.minerguy341.rackgear.content.rack.RackBlock;
+import com.minerguy341.rackgear.content.rack.DrivenRackBlock;
+import com.minerguy341.rackgear.content.rack.DrivenRackBlockEntity;
+import com.minerguy341.rackgear.content.rack.RackTeeth;
 import com.simibubi.create.api.behaviour.movement.MovementBehaviour;
+import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.behaviour.MovementContext;
 import com.simibubi.create.content.contraptions.render.ActorVisual;
 import com.simibubi.create.content.contraptions.render.ContraptionMatrices;
@@ -21,14 +24,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Makes a pinion riding a contraption roll along racks placed in the world — the mirror image of
+ * Rolls a pinion riding a contraption along racks placed in the world — the mirror image of
  * {@link RackPinionBlockEntity}, which watches racks being carried past a pinion standing in the
  * world.
  *
- * <p>As a contraption actor the pinion is ticked with its world position and motion on both sides,
- * so the rolling speed is read straight from the contraption's motion rather than reconstructed. The
- * rotation it produces stays on the contraption: contraptions have no kinetic network, so it drives
- * the animation and nothing else.
+ * <p>As a contraption actor the pinion is ticked with its world position, motion and rotation on
+ * both sides, so the rolling speed comes straight from the contraption's motion. The rotation cannot
+ * stay on the contraption — Create gives contraptions no kinetic network — so it is handed to the
+ * {@link DrivenRackBlockEntity} being rolled over, which is in the world and can drive a network.
  */
 public class RackPinionMovementBehaviour implements MovementBehaviour {
 
@@ -37,6 +40,9 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 
 	/** Accumulated rotation in degrees, so the cog keeps its phase from tick to tick. */
 	public static final String ANGLE_KEY = "Angle";
+
+	/** Position of the driven rack currently being powered, so it can be released on the way out. */
+	private static final String DRIVEN_RACK_KEY = "DrivenRack";
 
 	/** Create animates a kinetic block at {@code speed * 3/10} degrees per tick. */
 	private static final float DEGREES_PER_TICK_PER_RPM = 3 / 10f;
@@ -49,33 +55,82 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 
 	@Override
 	public void tick(MovementContext context) {
-		float speed = rollingSpeed(context);
+		Mesh mesh = findMesh(context);
+		float speed = mesh == null ? 0 : mesh.speed();
+
 		context.data.putFloat(SPEED_KEY, speed);
 		context.data.putFloat(ANGLE_KEY,
 			(context.data.getFloat(ANGLE_KEY) + speed * DEGREES_PER_TICK_PER_RPM) % 360);
+
+		Level level = context.world;
+		if (level == null || level.isClientSide)
+			return;
+		updateDrivenRack(context, level, mesh);
 	}
 
 	@Override
 	public void stopMoving(MovementContext context) {
 		context.data.putFloat(SPEED_KEY, 0);
+		Level level = context.world;
+		if (level != null && !level.isClientSide)
+			releaseDrivenRack(context, level);
 	}
 
-	/** The speed the pinion is currently being rolled at by the rack underneath it, in RPM. */
-	public static float rollingSpeed(MovementContext context) {
+	/**
+	 * Hands the rotation to the rack being rolled over. The rack left behind is released first, in
+	 * the same tick, so two racks never claim to power the same network at once.
+	 */
+	private static void updateDrivenRack(MovementContext context, Level level, @Nullable Mesh mesh) {
+		BlockPos target = mesh == null ? null : mesh.rackPos();
+		BlockPos previous = readDrivenRack(context);
+		if (previous != null && !previous.equals(target))
+			releaseDrivenRack(context, level);
+
+		if (mesh == null)
+			return;
+		if (level.getBlockEntity(target) instanceof DrivenRackBlockEntity rack) {
+			rack.drive(mesh.speed(), driverId(context), level.getGameTime());
+			context.data.putLong(DRIVEN_RACK_KEY, target.asLong());
+		}
+	}
+
+	private static void releaseDrivenRack(MovementContext context, Level level) {
+		BlockPos previous = readDrivenRack(context);
+		if (previous == null)
+			return;
+		context.data.remove(DRIVEN_RACK_KEY);
+		if (level.getBlockEntity(previous) instanceof DrivenRackBlockEntity rack)
+			rack.stopDriving(driverId(context));
+	}
+
+	@Nullable
+	private static BlockPos readDrivenRack(MovementContext context) {
+		return context.data.contains(DRIVEN_RACK_KEY) ? BlockPos.of(context.data.getLong(DRIVEN_RACK_KEY)) : null;
+	}
+
+	/** Identifies the contraption driving a rack, so only it can revoke the rotation again. */
+	private static int driverId(MovementContext context) {
+		AbstractContraptionEntity entity = context.contraption.entity;
+		return entity == null ? 0 : entity.getId();
+	}
+
+	/** The rack the pinion is currently rolling along, and how fast that turns it. */
+	@Nullable
+	private static Mesh findMesh(MovementContext context) {
 		Level level = context.world;
 		if (level == null || context.disabled || context.contraption.stalled)
-			return 0;
+			return null;
 
 		Vec3 motion = context.motion;
 		if (motion.length() < RackMeshing.MOTION_EPSILON)
-			return 0;
+			return null;
 
 		Axis pinionAxis = worldAxis(context);
 		if (pinionAxis == null)
-			return 0;
+			return null;
 
 		BlockPos pos = BlockPos.containing(context.position);
-		float fastest = 0;
+		Mesh best = null;
 		for (Direction toRack : Direction.values()) {
 			if (!RackMeshing.canMesh(pinionAxis, toRack))
 				continue;
@@ -85,15 +140,19 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 			if (Math.abs(along) < RackMeshing.MOTION_EPSILON)
 				continue;
 
-			BlockState rack = level.getBlockState(pos.relative(toRack));
-			if (!(rack.getBlock() instanceof RackBlock) || rack.getValue(RackBlock.AXIS) != rackAxis)
+			BlockPos rackPos = pos.relative(toRack);
+			BlockState rack = level.getBlockState(rackPos);
+			if (!RackTeeth.runsAlong(rack, rackAxis))
+				continue;
+			// A driven rack only takes power off along its own shaft.
+			if (rack.getBlock() instanceof DrivenRackBlock driven && driven.getRotationAxis(rack) != pinionAxis)
 				continue;
 
 			float speed = RackMeshing.toRotationSpeed(along, RackMeshing.meshDirection(pinionAxis, toRack));
-			if (Math.abs(speed) > Math.abs(fastest))
-				fastest = speed;
+			if (best == null || Math.abs(speed) > Math.abs(best.speed()))
+				best = new Mesh(rackPos, speed);
 		}
-		return fastest;
+		return best;
 	}
 
 	/** The pinion's rotation axis in world space, or null while a rotating contraption holds it askew. */
@@ -117,5 +176,8 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 	public ActorVisual createVisual(VisualizationContext visualizationContext, VirtualRenderWorld simulationWorld,
 		MovementContext movementContext) {
 		return new RackPinionActorVisual(visualizationContext, simulationWorld, movementContext);
+	}
+
+	private record Mesh(BlockPos rackPos, float speed) {
 	}
 }

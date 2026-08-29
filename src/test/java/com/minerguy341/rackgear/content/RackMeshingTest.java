@@ -1,10 +1,13 @@
 package com.minerguy341.rackgear.content;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+
+import com.minerguy341.rackgear.content.rack.DrivenRackBlock;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
@@ -45,6 +48,17 @@ class RackMeshingTest {
 				assertEquals(1, Math.abs(RackMeshing.meshDirection(axis, side)), 1e-9,
 					"mesh direction for " + axis + "/" + side + " should be +/-1");
 			}
+	}
+
+	@Test
+	void aDrivenRacksShaftAlwaysCrossesItsBar() {
+		for (Axis bar : Axis.values()) {
+			Axis first = DrivenRackBlock.shaftAxis(bar, true);
+			Axis second = DrivenRackBlock.shaftAxis(bar, false);
+			assertNotEquals(bar, first, "the shaft cannot run along the bar");
+			assertNotEquals(bar, second, "the shaft cannot run along the bar");
+			assertNotEquals(first, second, "the two settings must pick different axes");
+		}
 	}
 
 	@Test

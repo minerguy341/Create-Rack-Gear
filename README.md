@@ -42,6 +42,8 @@ Two blocks:
 
 - **Rack** — a toothed bar with an axis, no kinetics of its own. Teeth run along all four sides, so
   a pinion meshes with it from any side.
+- **Driven Rack** — a rack segment with a shaft, for taking power off a rack line when the *pinion*
+  is the part that moves. Drop one into the line wherever the shaft should be.
 - **Rack Pinion** — a large cogwheel that is also a kinetic *generator*. It meshes with Create's
   cogwheels exactly like a large cogwheel does (it implements `ICogWheel`), and it produces rotation
   when a rack is dragged past it.
@@ -67,14 +69,14 @@ The pinion generates rotation for the *world* network, so the rack is the part t
 
 | Rack | Pinion | Result |
 | --- | --- | --- |
-| on a moving contraption | placed in the world | pinion spins and powers the network it is attached to |
-| in the world | on a moving contraption | pinion rolls along the rack and spins, but drives nothing |
+| on a moving contraption | placed in the world | the pinion spins and powers the network it is attached to |
+| in the world | on a moving contraption | the pinion rolls, and powers any **Driven Rack** it passes over |
 | in the world | in the world | nothing moves, so nothing turns |
 
-Both directions are computed the same way, from the relative motion of the two parts; they differ
-only in where the rotation can go. Rotation on a contraption has nowhere to go — Create gives
-contraptions no kinetic network — so the rolling pinion turns visibly and stops there. See
-[Making the rolling pinion do work](#making-the-rolling-pinion-do-work) for what would change that.
+Both directions are computed the same way, from the relative motion of the two parts. They differ
+only in where the rotation is produced: rotation cannot leave a contraption — Create gives
+contraptions no kinetic network — so when the pinion is the moving part, the generator has to be the
+block standing in the world, which is what the Driven Rack is for.
 
 Any contraption that translates works as the carrier: pistons, pulleys, gantry carriages and trains.
 A contraption that only rotates (a bearing) imparts no linear motion at the meshing point and is
@@ -99,15 +101,24 @@ Ponder scene — shows nothing where the pinion should be. If that turns out to 
 one Create uses for brackets: stash a flag in `ModelData` from `getModelData`, which does get handed
 the world, and keep the static quads for every virtual world except a contraption's.
 
-### Making the rolling pinion do work
+### The Driven Rack
 
-Rotation cannot leave a contraption, but an actor *can* reach into the world it passes. So the way to
-make the second row of the table do something is to move the generator to the world side: give the
-**rack** a kinetic block entity with an output axis, and have the passing actor pinion drive it, so
-the rack powers whatever shafts or cogwheels it is connected to. That is a real change in scope —
-a block entity per rack block, an output direction to place, and a hand-off as the pinion crosses
-from one rack to the next — but it is the version where a train rolling past a rack line generates
-rotation in the world.
+A pinion riding a contraption produces rotation that has nowhere to go, but an actor *can* reach into
+the world it passes over — so the generator lives on the world side instead. A Driven Rack is a rack
+segment carrying a shaft: while a rolling pinion is meshed with it, it generates that pinion's speed
+for whatever the shaft is connected to. Plain racks make up the rest of the line, so only the
+segments you actually take power from carry a block entity.
+
+Two axes matter and they are always perpendicular. The bar runs along the line, like any rack. The
+shaft leaves along one of the two axes across the bar; placement aims it across your line of sight
+and a wrench cycles it. A pinion only drives the rack if its own rotation axis matches that shaft —
+otherwise the teeth are meshing but the shaft points the wrong way.
+
+The pinion releases the rack it is leaving in the same tick it takes up the next one, so two racks in
+one network never both claim to be a source, which Create would report as a conflict. A rack that
+stops being renewed for more than two ticks drops back to zero on its own, in case a contraption is
+unloaded mid-roll. The pattern is Create's own powered shaft, which is driven from outside by a steam
+engine in exactly this way.
 
 ## Layout
 
@@ -116,7 +127,11 @@ src/main/java/com/minerguy341/rackgear/
 ├── CreateRackGear.java                  @Mod entry point, owns the CreateRegistrate
 ├── content/
 │   ├── RackMeshing.java                 meshing geometry, direction and speed conversion
-│   ├── rack/RackBlock.java              the toothed bar
+│   ├── rack/
+│   │   ├── RackTeeth.java               shared teeth: what a pinion can mesh with
+│   │   ├── RackBlock.java               the plain toothed bar
+│   │   ├── DrivenRackBlock.java         rack segment with a shaft, bar and shaft axes
+│   │   └── DrivenRackBlockEntity.java   holds the rotation a passing pinion produces
 │   └── pinion/
 │       ├── RackPinionBlock.java              large cog that Create's propagator meshes with
 │       ├── RackPinionBlockEntity.java        finds passing racks, generates the rotation
@@ -149,12 +164,29 @@ chain plus a texture.
 Entries built after `CreateRegistrate#setCreativeTab` (called in the mod constructor) are added to
 the mod's creative tab automatically, which is why `RackGearCreativeTab` declares no display items.
 
+## Rendering
+
+Everything that turns is instanced through Flywheel, except one case:
+
+| Part | Flywheel | Fallback |
+| --- | --- | --- |
+| Driven Rack shaft | `SingleAxisRotatingVisual::shaft`, Create's own shaft visual | `ShaftRenderer` |
+| Pinion rolling on a contraption | `RackPinionActorVisual` | `RackPinionActorRenderer` |
+| Pinion standing in the world | none | `RackPinionRenderer`, on every backend |
+
+The last row is the odd one out. Create's cogwheels are instanced through a visual keyed on a
+`PartialModel`; this pinion has no partial model of its own — it borrows Create's large cogwheel
+model through the blockstate — so it is drawn by the block entity renderer whatever the backend is.
+That costs a draw call per pinion rather than an instance. Registering a `PartialModel` at client
+init and swapping in `SingleAxisRotatingVisual.of(...)` is the fix.
+
 ## Next steps
 
 - **Its own model.** The pinion currently parents `create:block/large_cogwheel`, so it is
   indistinguishable from a large cogwheel in hand and in world.
-- **A Flywheel visual.** `RackPinionRenderer` draws on every backend rather than instancing through
-  Flywheel; a `SingleAxisRotatingVisual` would batch it like Create's own cogwheels.
+- **A Flywheel visual for the pinion standing in the world.** The Driven Rack's shaft and the rolling
+  pinion are both instanced (see below), but `RackPinionRenderer` still draws on every backend,
+  because instancing the cog needs a `PartialModel` of its own registered at client init.
 - **Kinetic output for the rolling pinion**, per the section above.
 - **A Ponder scene** under `data/create_rack_gear/ponder/`, which is how Create explains mechanics.
 

@@ -8,6 +8,7 @@ import com.minerguy341.rackgear.content.RackMeshing;
 import com.minerguy341.rackgear.content.pinion.RackPinionBlock;
 import com.minerguy341.rackgear.content.pinion.RackPinionModel;
 import com.minerguy341.rackgear.content.pinion.RackPinionMovementBehaviour;
+import com.minerguy341.rackgear.content.rack.DrivenRackBlock;
 import com.minerguy341.rackgear.content.rack.RackBlock;
 import com.simibubi.create.api.behaviour.movement.MovementBehaviour;
 import com.simibubi.create.api.stress.BlockStressValues;
@@ -16,8 +17,10 @@ import com.simibubi.create.foundation.data.CreateRegistrate;
 import com.simibubi.create.foundation.data.SharedProperties;
 import com.tterrag.registrate.util.entry.BlockEntry;
 
+import net.minecraft.core.Direction.Axis;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.MapColor;
+import net.neoforged.neoforge.client.model.generators.ConfiguredModel;
 
 /**
  * Block registry. Registrate generates the blockstate, item model, loot table and en_us entry for
@@ -38,6 +41,28 @@ public class RackGearBlocks {
 			.noOcclusion())
 		.transform(pickaxeOnly())
 		.blockstate(BlockStateGen.axisBlockProvider(false))
+		.simpleItem()
+		.register();
+
+	public static final BlockEntry<DrivenRackBlock> DRIVEN_RACK = REGISTRATE
+		.block("driven_rack", DrivenRackBlock::new)
+		.initialProperties(SharedProperties::stone)
+		.properties(p -> p.mapColor(MapColor.TERRACOTTA_ORANGE)
+			.sound(SoundType.NETHERITE_BLOCK)
+			.noOcclusion())
+		.transform(pickaxeOnly())
+		.blockstate((c, p) -> p.getVariantBuilder(c.get())
+			.forAllStatesExcept(state -> {
+				Axis axis = state.getValue(DrivenRackBlock.AXIS);
+				return ConfiguredModel.builder()
+					.modelFile(p.models()
+						.getExistingFile(p.modLoc("block/driven_rack")))
+					.rotationX(axis == Axis.Y ? 0 : 90)
+					.rotationY(axis == Axis.X ? 90 : axis == Axis.Z ? 180 : 0)
+					.build();
+			}, DrivenRackBlock.SHAFT_ALONG_FIRST))
+		.onRegister(block -> BlockStressValues.CAPACITIES.register(block, () -> STRESS_CAPACITY))
+		.onRegister(BlockStressValues.setGeneratorSpeed((int) RackMeshing.MAX_RPM, true))
 		.simpleItem()
 		.register();
 

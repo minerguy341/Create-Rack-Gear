@@ -3,7 +3,7 @@ package com.minerguy341.rackgear.content.pinion;
 import java.util.List;
 
 import com.minerguy341.rackgear.content.RackMeshing;
-import com.minerguy341.rackgear.content.rack.RackBlock;
+import com.minerguy341.rackgear.content.rack.RackTeeth;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.Contraption;
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
@@ -111,13 +111,15 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		BlockPos localPos = BlockPos.containing(entity.toLocalVector(Vec3.atCenterOf(meshPos), 1));
 		StructureBlockInfo info = contraption.getBlocks()
 			.get(localPos);
-		if (info == null || !(info.state()
-			.getBlock() instanceof RackBlock))
+		if (info == null)
+			return false;
+
+		Axis barAxis = RackTeeth.barAxisOf(info.state());
+		if (barAxis == null)
 			return false;
 
 		// Contraptions can be rotated, so the rack's axis is compared in world space.
-		Vec3 worldAxis = entity.applyRotation(RackMeshing.unit(info.state()
-			.getValue(RackBlock.AXIS)), 1);
+		Vec3 worldAxis = entity.applyRotation(RackMeshing.unit(barAxis), 1);
 		return Math.abs(worldAxis.dot(RackMeshing.unit(requiredAxis))) > 0.9;
 	}
 }

@@ -1,0 +1,16 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"category": "misc",
+	"ingredients": [
+		{
+			"item": "create_rack_gear:rack"
+		},
+		{
+			"item": "create:shaft"
+		}
+	],
+	"result": {
+		"id": "create_rack_gear:driven_rack",
+		"count": 1
+	}
+}
