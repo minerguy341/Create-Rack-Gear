@@ -7,7 +7,9 @@ import com.minerguy341.rackgear.CreateRackGear;
 import com.minerguy341.rackgear.content.RackMeshing;
 import com.minerguy341.rackgear.content.pinion.RackPinionBlock;
 import com.minerguy341.rackgear.content.pinion.RackPinionModel;
+import com.minerguy341.rackgear.content.pinion.RackPinionMovementBehaviour;
 import com.minerguy341.rackgear.content.rack.RackBlock;
+import com.simibubi.create.api.behaviour.movement.MovementBehaviour;
 import com.simibubi.create.api.stress.BlockStressValues;
 import com.simibubi.create.foundation.data.BlockStateGen;
 import com.simibubi.create.foundation.data.CreateRegistrate;
@@ -48,6 +50,7 @@ public class RackGearBlocks {
 		.transform(axeOrPickaxe())
 		.blockstate(BlockStateGen.axisBlockProvider(false))
 		.onRegister(CreateRegistrate.blockModel(() -> RackPinionModel::new))
+		.onRegister(MovementBehaviour.movementBehaviour(new RackPinionMovementBehaviour()))
 		.onRegister(block -> BlockStressValues.CAPACITIES.register(block, () -> STRESS_CAPACITY))
 		.onRegister(BlockStressValues.setGeneratorSpeed((int) RackMeshing.MAX_RPM, true))
 		.simpleItem()

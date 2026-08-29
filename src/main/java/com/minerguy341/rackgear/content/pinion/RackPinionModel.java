@@ -3,7 +3,6 @@ package com.minerguy341.rackgear.content.pinion;
 import java.util.Collections;
 import java.util.List;
 
-import net.createmod.ponder.render.VirtualRenderHelper;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.resources.model.BakedModel;
@@ -14,9 +13,9 @@ import net.neoforged.neoforge.client.model.BakedModelWrapper;
 import net.neoforged.neoforge.client.model.data.ModelData;
 
 /**
- * Keeps the pinion out of the chunk mesh so it isn't drawn twice: in the world the block entity
- * renderer draws the rotating copy, while virtual renders — contraptions and Ponder scenes, where no
- * block entity exists — still get the static model. This mirrors how Create hides its own cogwheels.
+ * Keeps the pinion out of the baked mesh so it is never drawn twice. Every place the block appears,
+ * something else draws it turning: {@link RackPinionRenderer} in the world, and
+ * {@link RackPinionActorVisual} or {@link RackPinionActorRenderer} while it rides a contraption.
  */
 public class RackPinionModel extends BakedModelWrapper<BakedModel> {
 
@@ -27,8 +26,6 @@ public class RackPinionModel extends BakedModelWrapper<BakedModel> {
 	@Override
 	public List<BakedQuad> getQuads(BlockState state, Direction side, RandomSource rand, ModelData data,
 		RenderType renderType) {
-		if (VirtualRenderHelper.isVirtual(data))
-			return super.getQuads(state, side, rand, data, renderType);
 		return Collections.emptyList();
 	}
 }

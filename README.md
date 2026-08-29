@@ -67,18 +67,47 @@ The pinion generates rotation for the *world* network, so the rack is the part t
 
 | Rack | Pinion | Result |
 | --- | --- | --- |
-| on a moving contraption | placed in the world | pinion spins, powers the network it is attached to |
+| on a moving contraption | placed in the world | pinion spins and powers the network it is attached to |
+| in the world | on a moving contraption | pinion rolls along the rack and spins, but drives nothing |
 | in the world | in the world | nothing moves, so nothing turns |
-| in the world | on a moving contraption | **not implemented** — see below |
 
-A pinion riding a contraption cannot power anything: contraptions have no kinetic network in Create,
-so rotation generated there would have nowhere to go. Making the cog *look* like it spins as it
-travels along a world rack is possible (a `MovementBehaviour` with an `ActorVisual`), and is the
-obvious next addition if the visual is what you are after — but it stays cosmetic.
+Both directions are computed the same way, from the relative motion of the two parts; they differ
+only in where the rotation can go. Rotation on a contraption has nowhere to go — Create gives
+contraptions no kinetic network — so the rolling pinion turns visibly and stops there. See
+[Making the rolling pinion do work](#making-the-rolling-pinion-do-work) for what would change that.
 
-Any contraption that translates works as the rack's carrier: pistons, pulleys, gantry carriages and
-trains. A contraption that only rotates (a bearing) imparts no linear motion at the meshing point
-and is ignored.
+Any contraption that translates works as the carrier: pistons, pulleys, gantry carriages and trains.
+A contraption that only rotates (a bearing) imparts no linear motion at the meshing point and is
+ignored.
+
+### The pinion as a contraption actor
+
+A pinion riding a contraption is registered as a Create **actor** (a `MovementBehaviour`), which is
+what lets it roll at all. Actors are ticked with their world position and motion on both sides, so
+`RackPinionMovementBehaviour` reads the rolling speed straight from the contraption's motion,
+looks up the world rack it is meshing with, and keeps the accumulated angle in the actor's data.
+Rendering follows Create's own actors: `RackPinionActorVisual` instances the cog through Flywheel,
+`RackPinionActorRenderer` draws it on the fallback path.
+
+Being an actor also means the pinion is disabled by Contraption Controls like any other actor, and
+it has `visitNewPosition` available — the hook Create's drills and harvesters use to affect the world
+they pass over.
+
+Taking over the rendering has one known cost: `RackPinionModel` now drops the block's baked quads
+everywhere, so anything that draws the block from its baked model alone — a schematic preview, a
+Ponder scene — shows nothing where the pinion should be. If that turns out to matter, the fix is the
+one Create uses for brackets: stash a flag in `ModelData` from `getModelData`, which does get handed
+the world, and keep the static quads for every virtual world except a contraption's.
+
+### Making the rolling pinion do work
+
+Rotation cannot leave a contraption, but an actor *can* reach into the world it passes. So the way to
+make the second row of the table do something is to move the generator to the world side: give the
+**rack** a kinetic block entity with an output axis, and have the passing actor pinion drive it, so
+the rack powers whatever shafts or cogwheels it is connected to. That is a real change in scope —
+a block entity per rack block, an output direction to place, and a hand-off as the pinion crosses
+from one rack to the next — but it is the version where a train rolling past a rack line generates
+rotation in the world.
 
 ## Layout
 
@@ -89,10 +118,13 @@ src/main/java/com/minerguy341/rackgear/
 │   ├── RackMeshing.java                 meshing geometry, direction and speed conversion
 │   ├── rack/RackBlock.java              the toothed bar
 │   └── pinion/
-│       ├── RackPinionBlock.java         large cog that Create's propagator meshes with
-│       ├── RackPinionBlockEntity.java   finds passing racks, generates the rotation
-│       ├── RackPinionRenderer.java      draws the cog spinning
-│       └── RackPinionModel.java         keeps the static copy out of the chunk mesh
+│       ├── RackPinionBlock.java              large cog that Create's propagator meshes with
+│       ├── RackPinionBlockEntity.java        finds passing racks, generates the rotation
+│       ├── RackPinionMovementBehaviour.java  actor: rolls along world racks on a contraption
+│       ├── RackPinionActorVisual.java        instanced rendering of the rolling cog
+│       ├── RackPinionActorRenderer.java      fallback rendering of the rolling cog
+│       ├── RackPinionRenderer.java           draws the cog spinning in the world
+│       └── RackPinionModel.java              keeps the static copy out of the baked mesh
 └── registry/
     ├── RackGearBlocks.java              block + item registration
     ├── RackGearBlockEntities.java       block entity types and renderers
@@ -123,7 +155,7 @@ the mod's creative tab automatically, which is why `RackGearCreativeTab` declare
   indistinguishable from a large cogwheel in hand and in world.
 - **A Flywheel visual.** `RackPinionRenderer` draws on every backend rather than instancing through
   Flywheel; a `SingleAxisRotatingVisual` would batch it like Create's own cogwheels.
-- **Cosmetic spin on contraptions**, per the table above.
+- **Kinetic output for the rolling pinion**, per the section above.
 - **A Ponder scene** under `data/create_rack_gear/ponder/`, which is how Create explains mechanics.
 
 ## License
