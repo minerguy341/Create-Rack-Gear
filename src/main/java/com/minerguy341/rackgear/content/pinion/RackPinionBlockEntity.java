@@ -4,12 +4,15 @@ import java.util.List;
 
 import com.minerguy341.rackgear.content.RackMeshing;
 import com.minerguy341.rackgear.content.rack.RackTeeth;
+import com.minerguy341.rackgear.content.sublevel.RackSubLevels;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.Contraption;
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
@@ -30,7 +33,14 @@ import net.minecraft.world.phys.Vec3;
  */
 public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 
+	/**
+	 * Ticks a locked pinion holds a contraption before its teeth give way. Long enough to notice the
+	 * machine straining and cut the load, short enough that a jam resolves itself if you don't.
+	 */
+	private static final int STRAIN_TICKS = 60;
+
 	private float generatedSpeed;
+	private int strainTicks;
 
 	public RackPinionBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
@@ -47,13 +57,37 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		if (level == null || level.isClientSide)
 			return;
 
-		Scan scan = scanForPassingRacks();
+		if (!(getBlockState().getBlock() instanceof RackPinionBlock))
+			return;
+		Axis axis = getBlockState().getValue(RackPinionBlock.AXIS);
+
+		Scan scan = scanForPassingRacks(axis);
 		// A contraption we have locked is standing still, but it is still pressing its rack into our
 		// teeth: keeping the load on is what keeps the network overstressed, and so keeps it locked.
 		// This is gated on the jam being ours, so a contraption stalled for its own reasons — a drill
 		// on bedrock, say — parks its rack against a free pinion and generates nothing.
 		boolean holdLoad = scan.speed() == 0 && scan.holdsLockedRack() && isJammed();
+
 		float speed = holdLoad ? generatedSpeed : scan.speed();
+		if (speed == 0) {
+			// Sable sub-levels carry their blocks as real blocks rather than as contraption data, so
+			// they are searched separately: one for a ship sweeping a rack past a pinion planted in
+			// the world, one for this pinion riding a ship over racks laid in the world.
+			speed = RackSubLevels.INSTANCE.speedFromCarriedRacks(level, worldPosition, axis);
+			if (speed == 0)
+				speed = RackSubLevels.INSTANCE.speedFromWorldRacks(this, axis);
+		}
+
+		// Something keeps driving the teeth and the network will not turn: something has to give.
+		if (isJammed() && speed != 0) {
+			if (++strainTicks > STRAIN_TICKS) {
+				stripTeeth();
+				return;
+			}
+		} else {
+			strainTicks = 0;
+		}
+
 		if (speed == generatedSpeed)
 			return;
 
@@ -80,6 +114,12 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		generatedSpeed = compound.getFloat("GeneratedSpeed");
 	}
 
+	/** Breaks the pinion once it has been held against a network that will not turn for too long. */
+	private void stripTeeth() {
+		level.playSound(null, worldPosition, SoundEvents.ITEM_BREAK, SoundSource.BLOCKS, 1, 0.6f);
+		level.destroyBlock(worldPosition, true);
+	}
+
 	/** Whether the network this pinion drives is currently unable to turn, so racks cannot slip past it. */
 	public boolean isJammed() {
 		return overStressed;
@@ -89,12 +129,7 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 	 * The strongest rotation any passing rack is currently imparting, or 0 when nothing is moving
 	 * against the pinion's teeth.
 	 */
-	private Scan scanForPassingRacks() {
-		BlockState state = getBlockState();
-		if (!(state.getBlock() instanceof RackPinionBlock))
-			return Scan.NOTHING;
-
-		Axis pinionAxis = state.getValue(RackPinionBlock.AXIS);
+	private Scan scanForPassingRacks(Axis pinionAxis) {
 		List<AbstractContraptionEntity> nearby =
 			level.getEntitiesOfClass(AbstractContraptionEntity.class, new AABB(worldPosition).inflate(1));
 

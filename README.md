@@ -121,7 +121,10 @@ moving again — chattering once a tick. Holding it means the lock stays until y
 hold is gated on the jam being this pinion's own, so a contraption stalled for its own reasons (a
 drill against bedrock, say) parks its rack on a free pinion and generates nothing from it.
 
-To get moving again: cut the load, add capacity, or break the rack or the pinion.
+Not forever, though. A gear held against a network that will not turn strips its teeth after three
+seconds and breaks, dropping itself and freeing whatever was pushing it — so an overloaded rack line
+fails loudly and then resolves itself, rather than leaving a piston stuck until someone works out
+why. Cut the load or add capacity within those three seconds and it survives.
 
 ### The Driven Rack
 
@@ -156,6 +159,9 @@ src/main/java/com/minerguy341/rackgear/
 │   │   ├── RackBlock.java                   the plain toothed bar
 │   │   ├── DrivenRackBlock.java             rack segment with a shaft, bar and shaft axes
 │   │   └── DrivenRackBlockEntity.java       holds the rotation a passing pinion produces
+│   ├── sublevel/
+│   │   ├── RackSubLevels.java           the seam: a no-op unless Sable is loaded
+│   │   └── SableRackSubLevels.java      meshing across a sub-level's pose
 │   └── pinion/
 │       ├── RackPinionBlock.java             large cog that Create's propagator meshes with
 │       ├── RackPinionBlockEntity.java       finds passing racks, generates the rotation
@@ -217,7 +223,7 @@ except a contraption's.
 trains all carry racks and pinions, because all of them are `AbstractContraptionEntity` and all of
 them tick actors.
 
-**Create: Aeronautics** works differently, and interestingly so. Its vehicles are not Create
+**Create: Aeronautics** works differently, and is supported through a second path. Its vehicles are not Create
 contraptions — Aeronautics 1.3.2 depends on [Sable](https://modrinth.com/mod/sable), "a library mod
 for interactive moving block structures, or sub-levels", and its jar is full of sub-level machinery
 (`SubLevelAssemblyHelperMixin`, `ServerSubLevelMixin`, `retain_in_sub_level` entity tags). A
@@ -226,12 +232,22 @@ rendered in the world, rather than snapshotting them into a `Contraption`.
 
 That has a consequence worth knowing: **block entities aboard a sub-level tick**, so a Create kinetic
 network does run on an Aeronautics vehicle. Carried kinetics — impossible on a Create contraption —
-is simply how sub-levels work. It also means none of this mod's contraption code applies there: a
-sub-level is not an `AbstractContraptionEntity`, and blocks aboard one are ticking block entities
-rather than actors. Supporting it means a second detection path through Sable's own API, which is
-also the version where a pinion aboard a ship needs no Driven Rack at all — it can generate straight
-into the ship's own network. Sub-levels also rotate freely, so meshing there cannot assume the three
-world axes.
+is simply how sub-levels work. A pinion riding a ship therefore needs no Driven Rack: it generates
+straight into the ship's own network, and the rotation goes wherever the ship's shafts go.
+
+`SableRackSubLevels` implements both directions. A sub-level's blocks are real blocks standing
+elsewhere in the same level, and its pose maps them to where they appear, so meshing across the
+boundary is a matter of moving one position through that pose:
+`SableCompanion.INSTANCE.getAllIntersecting` finds ships near a pinion planted in the world, and
+`getContaining(BlockEntity)` finds the ship under a pinion that is riding one. Speed comes from
+comparing `logicalPose()` against `lastPose()` — where a spot was a tick ago against where it is now
+— which means this path handles a ship that rolls and pitches, something the contraption path, with
+its three fixed axes, cannot.
+
+Everything touching Sable lives in that one class, reached through `RackSubLevels.INSTANCE`, which
+resolves to a no-op unless the `sable` mod is loaded. Sable ships its API as a jar inside its jar and
+publishes it nowhere else, so `extractSableApi` takes it out to compile against; nothing of Sable's
+is shipped or required.
 
 ### Sable's physics properties
 
@@ -250,17 +266,13 @@ three blocks are `half_volume`, being bars and a cogwheel rather than solid cube
 inert when Sable is absent. A mod that wants exact numbers can ship its own
 `physics_block_properties` file instead of borrowing Sable's buckets.
 
-### What the sub-level path would use
+### Still open on sub-levels
 
-Sable's API is a workable target for it. `dev.ryanhcode.sable.sublevel.SubLevel`, with its server and
-client subclasses, is the level itself; `SubLevelHelper` converts entity positions in and out of one
-and walks connected chains; `SablePrePhysicsTickEvent` and `SablePostPhysicsTickEvent` bracket the
-physics step. Most directly, `dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor` is the
-sub-level's answer to a Create actor — a block entity aboard implements `sable$tick(ServerSubLevel)`
-and `sable$physicsTick(ServerSubLevel, RigidBodyHandle, double)` — which is the natural home for a
-pinion that has to notice the world rolling past beneath it. The world-to-sub-level transforms
-themselves live in the bundled `sable-companion-common` library behind `SubLevelAccess`, which is the
-next thing to read.
+The lock and the strain that breaks a jammed gear are contraption-side only: they work through
+`context.stall`, which a sub-level has no equivalent of. A ship rolling a pinion into an overstressed
+network currently just generates nothing rather than being held or stripping teeth. Sable's
+`BlockEntitySubLevelActor`, whose `sable$physicsTick` hands a block entity aboard its
+`RigidBodyHandle`, is where the equivalent would be built.
 
 ## Next steps
 
@@ -268,7 +280,6 @@ next thing to read.
   indistinguishable from a large cogwheel in hand and in world.
 - **Kinetic output for the rolling pinion**, per the section above.
 - **A Ponder scene** under `data/create_rack_gear/ponder/`, which is how Create explains mechanics.
-- **Sable sub-level support**, per the compatibility notes above.
 
 ## License
 

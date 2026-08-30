@@ -4,6 +4,8 @@ import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -20,7 +22,11 @@ public class DrivenRackBlockEntity extends GeneratingKineticBlockEntity {
 
 	private static final int NO_DRIVER = -1;
 
+	/** Ticks a jammed rack is driven before its teeth give way, matching the pinion. */
+	private static final int STRAIN_TICKS = 60;
+
 	private float drivenSpeed;
+	private int strainTicks;
 	private int driverId = NO_DRIVER;
 	private long lastDrivenTick = Long.MIN_VALUE;
 
@@ -38,8 +44,26 @@ public class DrivenRackBlockEntity extends GeneratingKineticBlockEntity {
 		super.tick();
 		if (level == null || level.isClientSide || drivenSpeed == 0)
 			return;
-		if (level.getGameTime() - lastDrivenTick > GRACE_TICKS)
+
+		if (level.getGameTime() - lastDrivenTick > GRACE_TICKS) {
 			stopDriving();
+			strainTicks = 0;
+			return;
+		}
+
+		// A pinion still rolling into a network that will not turn strips the rack it is riding.
+		if (!isJammed()) {
+			strainTicks = 0;
+			return;
+		}
+		if (++strainTicks > STRAIN_TICKS)
+			stripTeeth();
+	}
+
+	/** Breaks the rack once a pinion has been driving it against a jammed network for too long. */
+	private void stripTeeth() {
+		level.playSound(null, worldPosition, SoundEvents.ITEM_BREAK, SoundSource.BLOCKS, 1, 0.6f);
+		level.destroyBlock(worldPosition, true);
 	}
 
 

@@ -86,6 +86,21 @@ configurations {
     // Mods present in runClient and runServer but not in the published metadata.
     localRuntime
     runtimeClasspath.extendsFrom localRuntime
+
+    // The Sable mod jar, resolved only so its nested API library can be taken out of it.
+    sableArtifact
+}
+
+// Sable ships its sub-level and math API as a jar inside its jar, and publishes it nowhere else, so
+// it is extracted here to compile against. At runtime Sable loads that same library itself.
+def sableApiDir = layout.buildDirectory.dir('sable-api')
+def extractSableApi = tasks.register('extractSableApi', Copy) {
+    from({ configurations.sableArtifact.collect { zipTree(it) } }) {
+        include 'META-INF/jarjar/sable-companion-common-*.jar'
+        eachFile { it.relativePath = new RelativePath(true, it.name) }
+    }
+    into sableApiDir
+    includeEmptyDirs = false
 }
 
 dependencies {
@@ -95,7 +110,9 @@ dependencies {
     implementation "com.tterrag.registrate:Registrate:${registrate_version}"
 
     // Sable's sub-level API. Compile-time only: this mod does not ship or require it.
+    sableArtifact "maven.modrinth:sable:${sable_version}"
     compileOnly "maven.modrinth:sable:${sable_version}"
+    compileOnly fileTree(dir: sableApiDir, include: '*.jar').builtBy(extractSableApi)
 
     // Loaded into runClient and runServer so sub-level vehicles can be tested against the mechanic.
     // Aeronautics bundles Simulated and Offroad through jar-in-jar, so it pulls in its own stack.

@@ -1,5 +1,7 @@
 package com.minerguy341.rackgear.content;
 
+import org.jetbrains.annotations.Nullable;
+
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.util.Mth;
@@ -34,6 +36,18 @@ public final class RackMeshing {
 			if (axis != first && axis != second)
 				return axis;
 		throw new IllegalArgumentException("No third axis for " + first + " and " + second);
+	}
+
+	/**
+	 * The axis a direction lies along, or null when it points somewhere between two of them — which a
+	 * freely rotating carrier can do, and where teeth would not line up anyway.
+	 */
+	@Nullable
+	public static Axis nearestAxis(Vec3 direction) {
+		for (Axis axis : Axis.values())
+			if (Math.abs(direction.dot(unit(axis))) > 0.9)
+				return axis;
+		return null;
 	}
 
 	/** Teeth engage on the four sides around a pinion, never on its two shaft faces. */
