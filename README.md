@@ -53,6 +53,13 @@ Two blocks:
   cogwheels exactly like a large cogwheel does, and it produces rotation when a rack is dragged past
   it.
 
+The pinion also carries a cogwheel's placement manners: clicking the face of a cog already standing
+there drops the next one where it will actually mesh, and a pinion refuses to sit where a large
+cogwheel could not — beside another cog whose teeth it would pass through without ever engaging.
+Create's own `CogwheelBlockItem` could not be reused for the first, since it takes a `CogWheelBlock`
+and this pinion is a generator, so `RackPinionBlockItem` mirrors its large-cogwheel helper on top of
+the shared `DiagonalCogHelper`.
+
 Meshing takes two things, not one. `ICogWheel` with `isLargeCog()` is what makes Create's propagator
 *treat* the pinion as a large cog, but a block only ever connects to positions its block entity
 offers, and `KineticBlockEntity` offers diagonals to small cogs alone. Create adds the large-cog
@@ -171,6 +178,7 @@ src/main/java/com/minerguy341/rackgear/
 │   │   └── SableRackSubLevels.java      meshing across a sub-level's pose
 │   └── pinion/
 │       ├── RackPinionBlock.java             large cog that Create's propagator meshes with
+│       ├── RackPinionBlockItem.java         cogwheel-style assisted placement
 │       ├── RackPinionBlockEntity.java       finds passing racks, generates the rotation
 │       ├── RackPinionMovementBehaviour.java actor: rolls along world racks, drives Driven Racks
 │       ├── RackPinionActorVisual.java       instanced rendering of the rolling cog

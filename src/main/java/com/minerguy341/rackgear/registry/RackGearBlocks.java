@@ -6,6 +6,7 @@ import static com.simibubi.create.foundation.data.TagGen.pickaxeOnly;
 import com.minerguy341.rackgear.CreateRackGear;
 import com.minerguy341.rackgear.content.RackMeshing;
 import com.minerguy341.rackgear.content.pinion.RackPinionBlock;
+import com.minerguy341.rackgear.content.pinion.RackPinionBlockItem;
 import com.minerguy341.rackgear.content.pinion.RackPinionModel;
 import com.minerguy341.rackgear.content.pinion.RackPinionMovementBehaviour;
 import com.minerguy341.rackgear.content.rack.DrivenRackBlock;
@@ -81,7 +82,8 @@ public class RackGearBlocks {
 		.onRegister(MovementBehaviour.movementBehaviour(new RackPinionMovementBehaviour()))
 		.onRegister(block -> BlockStressValues.CAPACITIES.register(block, () -> STRESS_CAPACITY))
 		.onRegister(BlockStressValues.setGeneratorSpeed((int) RackMeshing.MAX_RPM, true))
-		.simpleItem()
+		.item(RackPinionBlockItem::new)
+		.build()
 		.register();
 
 	/** Called from the mod constructor to force class loading, which runs the registrations above. */
