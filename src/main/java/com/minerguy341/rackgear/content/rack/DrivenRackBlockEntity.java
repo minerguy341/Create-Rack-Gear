@@ -40,6 +40,11 @@ public class DrivenRackBlockEntity extends GeneratingKineticBlockEntity {
 			stopDriving();
 	}
 
+	/** Whether the network this rack drives is currently unable to turn, so a pinion cannot roll on. */
+	public boolean isJammed() {
+		return overStressed;
+	}
+
 	/** Called by a rolling pinion each tick it is meshed with this rack. */
 	public void drive(float speed, int driverId, long gameTime) {
 		this.driverId = driverId;

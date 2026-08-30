@@ -44,6 +44,10 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 	/** Position of the driven rack currently being powered, so it can be released on the way out. */
 	private static final String DRIVEN_RACK_KEY = "DrivenRack";
 
+	/** The rack and speed held while a jam has the pinion locked, so the load stays on it. */
+	private static final String HELD_RACK_KEY = "HeldRack";
+	private static final String HELD_SPEED_KEY = "HeldSpeed";
+
 	/** Create animates a kinetic block at {@code speed * 3/10} degrees per tick. */
 	private static final float DEGREES_PER_TICK_PER_RPM = 3 / 10f;
 
@@ -58,6 +62,8 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 		Mesh mesh = findMesh(context);
 		float speed = mesh == null ? 0 : mesh.speed();
 
+		// A locked pinion is not turning, and a locked contraption is not moving, so the animation
+		// stops on both sides without any special handling.
 		context.data.putFloat(SPEED_KEY, speed);
 		context.data.putFloat(ANGLE_KEY,
 			(context.data.getFloat(ANGLE_KEY) + speed * DEGREES_PER_TICK_PER_RPM) % 360);
@@ -65,15 +71,49 @@ public class RackPinionMovementBehaviour implements MovementBehaviour {
 		Level level = context.world;
 		if (level == null || level.isClientSide)
 			return;
-		updateDrivenRack(context, level, mesh);
+
+		// Teeth that cannot turn the rack they are pressed into do not slip past it: a jammed rack
+		// locks the contraption. The load is held on while locked, because letting it go would
+		// un-jam the network, clear the stall, and start the whole thing chattering once a tick.
+		Mesh candidate = mesh != null ? mesh : heldMesh(context);
+		boolean locked = candidate != null && isJammed(level, candidate.rackPos());
+		context.stall = locked;
+		setHeld(context, locked ? candidate : null);
+
+		updateDrivenRack(context, level, locked ? candidate : mesh);
 	}
 
 	@Override
 	public void stopMoving(MovementContext context) {
 		context.data.putFloat(SPEED_KEY, 0);
+		context.stall = false;
+		setHeld(context, null);
 		Level level = context.world;
 		if (level != null && !level.isClientSide)
 			releaseDrivenRack(context, level);
+	}
+
+	/** Whether the rack at this position is currently unable to turn. */
+	private static boolean isJammed(Level level, BlockPos rackPos) {
+		return level.getBlockEntity(rackPos) instanceof DrivenRackBlockEntity rack && rack.isJammed();
+	}
+
+	@Nullable
+	private static Mesh heldMesh(MovementContext context) {
+		if (!context.data.contains(HELD_RACK_KEY))
+			return null;
+		return new Mesh(BlockPos.of(context.data.getLong(HELD_RACK_KEY)), context.data.getFloat(HELD_SPEED_KEY));
+	}
+
+	private static void setHeld(MovementContext context, @Nullable Mesh mesh) {
+		if (mesh == null) {
+			context.data.remove(HELD_RACK_KEY);
+			context.data.remove(HELD_SPEED_KEY);
+			return;
+		}
+		context.data.putLong(HELD_RACK_KEY, mesh.rackPos()
+			.asLong());
+		context.data.putFloat(HELD_SPEED_KEY, mesh.speed());
 	}
 
 	/**

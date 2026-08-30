@@ -45,7 +45,13 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		if (level == null || level.isClientSide)
 			return;
 
-		float speed = scanForPassingRacks();
+		Scan scan = scanForPassingRacks();
+		// A contraption we have locked is standing still, but it is still pressing its rack into our
+		// teeth: keeping the load on is what keeps the network overstressed, and so keeps it locked.
+		// This is gated on the jam being ours, so a contraption stalled for its own reasons — a drill
+		// on bedrock, say — parks its rack against a free pinion and generates nothing.
+		boolean holdLoad = scan.speed() == 0 && scan.holdsLockedRack() && isJammed();
+		float speed = holdLoad ? generatedSpeed : scan.speed();
 		if (speed == generatedSpeed)
 			return;
 
@@ -53,23 +59,30 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		updateGeneratedRotation();
 	}
 
+	/** Whether the network this pinion drives is currently unable to turn, so racks cannot slip past it. */
+	public boolean isJammed() {
+		return overStressed;
+	}
+
 	/**
 	 * The strongest rotation any passing rack is currently imparting, or 0 when nothing is moving
 	 * against the pinion's teeth.
 	 */
-	private float scanForPassingRacks() {
+	private Scan scanForPassingRacks() {
 		BlockState state = getBlockState();
 		if (!(state.getBlock() instanceof RackPinionBlock))
-			return 0;
+			return Scan.NOTHING;
 
 		Axis pinionAxis = state.getValue(RackPinionBlock.AXIS);
 		List<AbstractContraptionEntity> nearby =
 			level.getEntitiesOfClass(AbstractContraptionEntity.class, new AABB(worldPosition).inflate(1));
 
 		float fastest = 0;
+		boolean holdsLockedRack = false;
 		for (AbstractContraptionEntity contraption : nearby) {
 			Vec3 velocity = velocityOf(contraption);
-			if (velocity.length() < RackMeshing.MOTION_EPSILON)
+			boolean stalled = contraption.getContraption() != null && contraption.getContraption().stalled;
+			if (velocity.length() < RackMeshing.MOTION_EPSILON && !stalled)
 				continue;
 
 			for (Direction toRack : Direction.values()) {
@@ -78,17 +91,24 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 
 				Axis rackAxis = RackMeshing.meshedRackAxis(pinionAxis, toRack);
 				double along = velocity.dot(RackMeshing.unit(rackAxis));
-				if (Math.abs(along) < RackMeshing.MOTION_EPSILON)
-					continue;
 				if (!carriesRackAt(contraption, worldPosition.relative(toRack), rackAxis))
 					continue;
+				if (Math.abs(along) < RackMeshing.MOTION_EPSILON) {
+					holdsLockedRack |= stalled;
+					continue;
+				}
 
 				float speed = RackMeshing.toRotationSpeed(along, RackMeshing.meshDirection(pinionAxis, toRack));
 				if (Math.abs(speed) > Math.abs(fastest))
 					fastest = speed;
 			}
 		}
-		return fastest;
+		return new Scan(fastest, holdsLockedRack);
+	}
+
+	/** What a sweep for passing racks found: how fast they turn us, and whether one is held against us. */
+	private record Scan(float speed, boolean holdsLockedRack) {
+		private static final Scan NOTHING = new Scan(0, false);
 	}
 
 	/**

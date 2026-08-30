@@ -98,6 +98,26 @@ they pass over.
 Taking over the rendering means the pinion is never drawn from its baked model; see
 [Rendering](#rendering) for how every path draws it instead, and what that costs.
 
+### Locking up
+
+Teeth that cannot turn the gear they are pressed into do not slip past it. So when the network a
+pinion drives is **overstressed**, the rack stops too, and the contraption pushing it stalls
+mid-stroke — a piston frozen halfway out, a train that will not pull away. Hang too much on a rack
+line and the machine driving it jams, rather than the network quietly stopping while the piston
+carries on.
+
+Both directions lock, and each needs an actor to do it, since only an actor can stall a contraption:
+`RackPinionMovementBehaviour` when the pinion is the part riding, and `RackMovementBehaviour` — the
+only reason a plain rack has a tick at all — when the rack is.
+
+While locked, the load is deliberately held on. Releasing it would drop the generated speed to zero,
+which would un-overstress the network, which would clear the stall, which would start the whole thing
+moving again — chattering once a tick. Holding it means the lock stays until you fix the network. The
+hold is gated on the jam being this pinion's own, so a contraption stalled for its own reasons (a
+drill against bedrock, say) parks its rack on a free pinion and generates nothing from it.
+
+To get moving again: cut the load, add capacity, or break the rack or the pinion.
+
 ### The Driven Rack
 
 A pinion riding a contraption produces rotation that has nowhere to go, but an actor *can* reach into
@@ -186,12 +206,41 @@ matters, the fix is the one Create uses for brackets: stash a flag in `ModelData
 `getModelData`, which does get handed the world, and keep the static quads for every virtual world
 except a contraption's.
 
+## Compatibility
+
+**Create contraptions** are the supported case throughout: pistons, pulleys, gantry carriages and
+trains all carry racks and pinions, because all of them are `AbstractContraptionEntity` and all of
+them tick actors.
+
+**Create: Aeronautics** works differently, and interestingly so. Its vehicles are not Create
+contraptions — Aeronautics 1.3.2 depends on [Sable](https://modrinth.com/mod/sable), "a library mod
+for interactive moving block structures, or sub-levels", and its jar is full of sub-level machinery
+(`SubLevelAssemblyHelperMixin`, `ServerSubLevelMixin`, `retain_in_sub_level` entity tags). A
+sub-level keeps the assembled structure as **real blocks in a level of its own**, transformed and
+rendered in the world, rather than snapshotting them into a `Contraption`.
+
+That has a consequence worth knowing: **block entities aboard a sub-level tick**, so a Create kinetic
+network does run on an Aeronautics vehicle. Carried kinetics — impossible on a Create contraption —
+is simply how sub-levels work. It also means none of this mod's contraption code applies there: a
+sub-level is not an `AbstractContraptionEntity`, and blocks aboard one are ticking block entities
+rather than actors. Supporting it means a second detection path through Sable's own API, which is
+also the version where a pinion aboard a ship needs no Driven Rack at all — it can generate straight
+into the ship's own network. Sub-levels also rotate freely, so meshing there cannot assume the three
+world axes.
+
+What ships today is one data file: `data/sable/tags/block/heavy.json` puts both rack blocks in
+Sable's `heavy` tag, since Sable and its addons appear to take a structure's mass from block tags
+(`heavy`, `super_heavy`, `light`, `super_light`, `quarter_volume`). That is inferred from how those
+tags are used in the Aeronautics bundle rather than from Sable's documentation, so it is worth
+confirming by weighing a ship. The tag is inert when Sable is absent.
+
 ## Next steps
 
 - **Its own model.** The pinion currently parents `create:block/large_cogwheel`, so it is
   indistinguishable from a large cogwheel in hand and in world.
 - **Kinetic output for the rolling pinion**, per the section above.
 - **A Ponder scene** under `data/create_rack_gear/ponder/`, which is how Create explains mechanics.
+- **Sable sub-level support**, per the compatibility notes above.
 
 ## License
 
