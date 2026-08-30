@@ -3,6 +3,8 @@ package com.minerguy341.rackgear.content.rack;
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -38,6 +40,25 @@ public class DrivenRackBlockEntity extends GeneratingKineticBlockEntity {
 			return;
 		if (level.getGameTime() - lastDrivenTick > GRACE_TICKS)
 			stopDriving();
+	}
+
+
+	/**
+	 * The generated speed has to reach the client: the goggle tooltip is built there, and it scales
+	 * the capacity a generator provides by {@code getGeneratedSpeed() / getTheoreticalSpeed()}. Left
+	 * unsynced, that ratio is zero on the client and the goggles read 0 su while the stressometer,
+	 * which reports the network as the server computed it, reads the real figure.
+	 */
+	@Override
+	protected void write(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
+		compound.putFloat("DrivenSpeed", drivenSpeed);
+		super.write(compound, registries, clientPacket);
+	}
+
+	@Override
+	protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
+		super.read(compound, registries, clientPacket);
+		drivenSpeed = compound.getFloat("DrivenSpeed");
 	}
 
 	/** Whether the network this rack drives is currently unable to turn, so a pinion cannot roll on. */

@@ -1,0 +1,8 @@
+{
+	"replace": false,
+	"values": [
+		"create_rack_gear:rack",
+		"create_rack_gear:driven_rack",
+		"create_rack_gear:rack_pinion"
+	]
+}

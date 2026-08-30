@@ -25,6 +25,8 @@ repositories {
     maven { url = 'https://maven.ithundxr.dev/snapshots' }
     // JEI, Vazkii's mods — handy once you add optional integrations
     maven { url = 'https://maven.blamejared.com' }
+    // Sable and Create: Aeronautics, for dev runs
+    maven { url = 'https://api.modrinth.com/maven' }
     mavenCentral()
 }
 
@@ -80,11 +82,27 @@ tasks.named('test', Test).configure {
 
 sourceSets.main.resources.srcDir 'src/generated/resources'
 
+configurations {
+    // Mods present in runClient and runServer but not in the published metadata.
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
 dependencies {
     // Create for NeoForge. Pulls in Registrate, Ponder, Catnip and Flywheel transitively.
     implementation "com.simibubi.create:create-${minecraft_version}:${create_version}"
     // Declared explicitly so the version is visible and pinnable.
     implementation "com.tterrag.registrate:Registrate:${registrate_version}"
+
+    // Sable's sub-level API. Compile-time only: this mod does not ship or require it.
+    compileOnly "maven.modrinth:sable:${sable_version}"
+
+    // Loaded into runClient and runServer so sub-level vehicles can be tested against the mechanic.
+    // Aeronautics bundles Simulated and Offroad through jar-in-jar, so it pulls in its own stack.
+    if (aeronautics_enable.toBoolean()) {
+        localRuntime "maven.modrinth:sable:${sable_version}"
+        localRuntime "maven.modrinth:create-aeronautics:${aeronautics_version}"
+    }
 
     testImplementation platform('org.junit:junit-bom:5.10.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'

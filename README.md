@@ -30,6 +30,11 @@ Ponder, Catnip and Flywheel come in transitively through Create. All versions li
 ./gradlew runData        # regenerate src/generated/resources
 ```
 
+The dev runs also load Sable and Create: Aeronautics, so the mechanic can be tested against
+sub-level vehicles as well as Create contraptions. Aeronautics brings Simulated and Offroad with it
+through jar-in-jar. Set `aeronautics_enable=false` in `gradle.properties` to leave them out; they are
+dev-run companions only and are not dependencies of the built mod.
+
 The first invocation downloads NeoForge and decompiles Minecraft, which takes several minutes and a
 few GB of disk. Subsequent builds are fast.
 
@@ -228,11 +233,34 @@ also the version where a pinion aboard a ship needs no Driven Rack at all — it
 into the ship's own network. Sub-levels also rotate freely, so meshing there cannot assume the three
 world axes.
 
-What ships today is one data file: `data/sable/tags/block/heavy.json` puts both rack blocks in
-Sable's `heavy` tag, since Sable and its addons appear to take a structure's mass from block tags
-(`heavy`, `super_heavy`, `light`, `super_light`, `quarter_volume`). That is inferred from how those
-tags are used in the Aeronautics bundle rather than from Sable's documentation, so it is worth
-confirming by weighing a ship. The tag is inert when Sable is absent.
+### Sable's physics properties
+
+Sable gives blocks their physical properties through data files at
+`data/sable/physics_block_properties/`, each pairing a `selector` with the properties it applies:
+
+```json
+{ "selector": "#sable:heavy", "properties": { "sable:mass": 2.0 },
+  "overrides": { "type=double": { "sable:mass": 4.0 } } }
+```
+
+So membership of tags like `sable:heavy` (mass 2.0), `sable:half_volume` (volume 0.5),
+`sable:bouncy` (restitution 0.5) is the intended way for another mod to declare how its blocks behave
+aboard a vehicle. This mod ships two: the rack blocks are `heavy`, being iron and andesite, and all
+three blocks are `half_volume`, being bars and a cogwheel rather than solid cubes. Both tag files are
+inert when Sable is absent. A mod that wants exact numbers can ship its own
+`physics_block_properties` file instead of borrowing Sable's buckets.
+
+### What the sub-level path would use
+
+Sable's API is a workable target for it. `dev.ryanhcode.sable.sublevel.SubLevel`, with its server and
+client subclasses, is the level itself; `SubLevelHelper` converts entity positions in and out of one
+and walks connected chains; `SablePrePhysicsTickEvent` and `SablePostPhysicsTickEvent` bracket the
+physics step. Most directly, `dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor` is the
+sub-level's answer to a Create actor — a block entity aboard implements `sable$tick(ServerSubLevel)`
+and `sable$physicsTick(ServerSubLevel, RigidBodyHandle, double)` — which is the natural home for a
+pinion that has to notice the world rolling past beneath it. The world-to-sub-level transforms
+themselves live in the bundled `sable-companion-common` library behind `SubLevelAccess`, which is the
+next thing to read.
 
 ## Next steps
 
