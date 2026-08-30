@@ -266,13 +266,20 @@ three blocks are `half_volume`, being bars and a cogwheel rather than solid cube
 inert when Sable is absent. A mod that wants exact numbers can ship its own
 `physics_block_properties` file instead of borrowing Sable's buckets.
 
-### Still open on sub-levels
+### Holding a ship back
 
-The lock and the strain that breaks a jammed gear are contraption-side only: they work through
-`context.stall`, which a sub-level has no equivalent of. A ship rolling a pinion into an overstressed
-network currently just generates nothing rather than being held or stripping teeth. Sable's
-`BlockEntitySubLevelActor`, whose `sable$physicsTick` hands a block entity aboard its
-`RigidBodyHandle`, is where the equivalent would be built.
+A contraption is stalled by raising a flag. A sub-level is a physical body, so it is held the way a
+gear really would hold one: while the pinion's network refuses to turn, an impulse is applied at the
+point where the teeth meet, taking half the momentum along them out of the ship each tick. Landing it
+at the meshing point rather than at the centre of mass means a ship caught by one corner is turned as
+well as slowed. Because the impulse uses total mass, which understates what actually resists an
+off-centre impulse, it brakes slightly softer than asked and closes the gap over the following ticks
+rather than snapping the ship to a halt.
+
+The load is held on while braking, for the same reason it is on a locked contraption: a stopped ship
+generates nothing, which would un-jam the network and free it again a tick later. So the ship stays
+pinned until the network is fixed — or until the pinion strips its teeth and breaks, which releases
+it either way.
 
 ## Next steps
 

@@ -41,6 +41,7 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 
 	private float generatedSpeed;
 	private int strainTicks;
+	private float subLevelHold;
 
 	public RackPinionBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
@@ -69,13 +70,25 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 		boolean holdLoad = scan.speed() == 0 && scan.holdsLockedRack() && isJammed();
 
 		float speed = holdLoad ? generatedSpeed : scan.speed();
-		if (speed == 0) {
+		if (speed != 0) {
+			subLevelHold = 0;
+		} else {
 			// Sable sub-levels carry their blocks as real blocks rather than as contraption data, so
-			// they are searched separately: one for a ship sweeping a rack past a pinion planted in
-			// the world, one for this pinion riding a ship over racks laid in the world.
-			speed = RackSubLevels.INSTANCE.speedFromCarriedRacks(level, worldPosition, axis);
-			if (speed == 0)
-				speed = RackSubLevels.INSTANCE.speedFromWorldRacks(this, axis);
+			// they are searched separately, in both directions: a ship sweeping a rack past a pinion
+			// planted in the world, and this pinion riding a ship over racks laid in the world. A jam
+			// also brakes the ship there, since a sub-level has no stall flag to raise.
+			float measured = RackSubLevels.INSTANCE.meshWithSubLevels(this, axis, isJammed());
+			if (measured != 0) {
+				subLevelHold = measured;
+				speed = measured;
+			} else if (isJammed() && subLevelHold != 0) {
+				// Braking a ship stops it, which would drop the load and free it again the next tick.
+				// The rotation is held instead, exactly as it is for a locked contraption, until the
+				// teeth give way or the network is fixed.
+				speed = subLevelHold;
+			} else {
+				subLevelHold = 0;
+			}
 		}
 
 		// Something keeps driving the teeth and the network will not turn: something has to give.

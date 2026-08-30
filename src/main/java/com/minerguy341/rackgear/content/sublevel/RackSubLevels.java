@@ -1,8 +1,6 @@
 package com.minerguy341.rackgear.content.sublevel;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.fml.ModList;
 
@@ -24,13 +22,14 @@ public interface RackSubLevels {
 
 	RackSubLevels INSTANCE = detect();
 
-	/** Rotation a pinion standing in the world takes from racks a sub-level carries past it. */
-	default float speedFromCarriedRacks(Level level, BlockPos pinionPos, Axis pinionAxis) {
-		return 0;
-	}
-
-	/** Rotation a pinion riding a sub-level takes from racks standing still in the world. */
-	default float speedFromWorldRacks(BlockEntity pinion, Axis axisAboard) {
+	/**
+	 * The rotation a pinion takes from a sub-level, whichever of the two is riding it.
+	 *
+	 * @param jammed whether the pinion's network refuses to turn, in which case the sub-level is also
+	 *               braked where the teeth meet — a contraption is stalled with a flag, but a
+	 *               sub-level is a physical body, so it is held back with an impulse instead.
+	 */
+	default float meshWithSubLevels(BlockEntity pinion, Axis pinionAxis, boolean jammed) {
 		return 0;
 	}
 
