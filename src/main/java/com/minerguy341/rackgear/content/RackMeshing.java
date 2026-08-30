@@ -1,7 +1,11 @@
 package com.minerguy341.rackgear.content;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.util.Mth;
@@ -48,6 +52,21 @@ public final class RackMeshing {
 			if (Math.abs(direction.dot(unit(axis))) > 0.9)
 				return axis;
 		return null;
+	}
+
+	/**
+	 * The twelve positions diagonally around {@code centre}: the ones a large cogwheel meshes across,
+	 * as opposed to the six its shaft reaches. Create proposes these from the block entity behind its
+	 * own cogwheels, and a large cog that does not offer them can only pass power along its shaft.
+	 */
+	public static List<BlockPos> meshingDiagonals(BlockPos centre) {
+		List<BlockPos> diagonals = new ArrayList<>(12);
+		BlockPos.betweenClosedStream(new BlockPos(-1, -1, -1), new BlockPos(1, 1, 1))
+			.forEach(offset -> {
+				if (offset.distSqr(BlockPos.ZERO) == 2)
+					diagonals.add(centre.offset(offset));
+			});
+		return diagonals;
 	}
 
 	/** Teeth engage on the four sides around a pinion, never on its two shaft faces. */

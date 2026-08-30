@@ -8,6 +8,7 @@ import com.minerguy341.rackgear.content.sublevel.RackSubLevels;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.Contraption;
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
+import com.simibubi.create.content.kinetics.base.IRotate;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -125,6 +126,19 @@ public class RackPinionBlockEntity extends GeneratingKineticBlockEntity {
 	protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.read(compound, registries, clientPacket);
 		generatedSpeed = compound.getFloat("GeneratedSpeed");
+	}
+
+	/**
+	 * A large cogwheel meshes with the cogs diagonally around it, not only with whatever its shaft
+	 * reaches. Create adds those positions in the block entity behind its own cogwheels, which this
+	 * one does not extend: {@code KineticBlockEntity} only offers diagonals to small cogs, so without
+	 * this a pinion passes power along its shaft and nowhere else — and being usually the source of
+	 * its network, that is the direction that matters.
+	 */
+	@Override
+	public List<BlockPos> addPropagationLocations(IRotate block, BlockState state, List<BlockPos> neighbours) {
+		neighbours.addAll(RackMeshing.meshingDiagonals(worldPosition));
+		return neighbours;
 	}
 
 	/** Breaks the pinion once it has been held against a network that will not turn for too long. */

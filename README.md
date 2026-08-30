@@ -50,8 +50,15 @@ Two blocks:
 - **Driven Rack** — a rack segment with a shaft, for taking power off a rack line when the *pinion*
   is the part that moves. Drop one into the line wherever the shaft should be.
 - **Rack Pinion** — a large cogwheel that is also a kinetic *generator*. It meshes with Create's
-  cogwheels exactly like a large cogwheel does (it implements `ICogWheel`), and it produces rotation
-  when a rack is dragged past it.
+  cogwheels exactly like a large cogwheel does, and it produces rotation when a rack is dragged past
+  it.
+
+Meshing takes two things, not one. `ICogWheel` with `isLargeCog()` is what makes Create's propagator
+*treat* the pinion as a large cog, but a block only ever connects to positions its block entity
+offers, and `KineticBlockEntity` offers diagonals to small cogs alone. Create adds the large-cog
+diagonals in the block entity behind its own cogwheels, which this generator does not extend — so
+`RackPinionBlockEntity` offers them itself. Without that a pinion passes power along its shaft and
+nowhere else, which, since it is usually its network's source, means almost nowhere.
 
 **Meshing.** The pinion looks at the four blocks around its shaft (never the two shaft faces). A
 rack in one of those positions meshes when it runs along the axis perpendicular to both the pinion's

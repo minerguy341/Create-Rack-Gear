@@ -5,7 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+
+import net.minecraft.core.BlockPos;
 
 import com.minerguy341.rackgear.content.rack.DrivenRackBlock;
 
@@ -59,6 +63,20 @@ class RackMeshingTest {
 			assertNotEquals(bar, second, "the shaft cannot run along the bar");
 			assertNotEquals(first, second, "the two settings must pick different axes");
 		}
+	}
+
+	@Test
+	void aPinionOffersEveryDiagonalItCouldMeshAcross() {
+		List<BlockPos> diagonals = RackMeshing.meshingDiagonals(BlockPos.ZERO);
+
+		assertEquals(12, diagonals.size(), "a large cogwheel meshes across twelve diagonals");
+		for (BlockPos diagonal : diagonals)
+			assertEquals(2, diagonal.distSqr(BlockPos.ZERO), 1e-9,
+				diagonal + " is not diagonally adjacent");
+		assertTrue(diagonals.contains(new BlockPos(1, 1, 0)), "in-plane diagonals mesh");
+		assertTrue(diagonals.contains(new BlockPos(0, 1, 1)), "diagonals across every axis mesh");
+		assertFalse(diagonals.contains(new BlockPos(1, 0, 0)), "the shaft's own neighbours are added elsewhere");
+		assertFalse(diagonals.contains(new BlockPos(1, 1, 1)), "corners do not mesh");
 	}
 
 	@Test
